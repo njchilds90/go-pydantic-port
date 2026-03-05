@@ -10,52 +10,80 @@ This library allows you to define and validate complex data structures with ease
 
 To install this library, run the following command:
 
-```go
-
-go get github.com/go-pydantic-port
+```bash
+go get github.com/njchilds90/go-pydantic-port
 ```
 
 ## Usage
 
 Here is an example of how to define and validate a simple data model:
 
-    package main
+```go
+package main
 
-    import (
-        "github.com/go-pydantic-port"
-        "github.com/go-playground/validator/v10"
-    )
+import (
+	"context"
+	"fmt"
 
-    type User struct {
-        Name  string `validate:"required"`
-        Email string `validate:"required,email"`
-    }
+	"github.com/go-pydantic-port"
+	"github.com/go-playground/validator/v10"
+)
 
-    func main() {
-        user := User{
-            Name:  "John Doe",
-            Email: "johndoe@example.com",
-        }
+// User represents a simple data model
+//godoc
+func NewUser(name string, email string) (*User, error) {
+	if name == "" || email == "" {
+		return nil, fmt.Errorf("invalid input: name and email are required")
+	}
+	return &User{
+		Name:  name,
+		Email: email,
+	}, nil
+}
 
-        err := pydantic.Validate(user)
-        if err != nil {
-            panic(err)
-        }
-    }
+type User struct {
+	Name  string `validate:"required"`
+	Email string `validate:"required,email"`
+}
+
+func main() {
+	ctx := context.Background()
+	user, err := NewUser("John Doe", "johndoe@example.com")
+	if err != nil {
+		panic(err)
+	}
+	
+	// example of using godoc comments for exported functions
+	// Validate takes a User and returns an error if validation fails
+	// godoc
+	func Validate(ctx context.Context, u *User) error {
+		if u == nil {
+			return fmt.Errorf("invalid input: user is nil")
+		}
+		return pydantic.Validate(ctx, u)
+	}
+	
+	if err := Validate(ctx, user); err != nil {
+		panic(err)
+	}
+}
 
 ## API Reference
 
 ### pydantic.Validate
 
 Validates a data model against a set of validation rules.
-
+* `ctx`: the context for the validation
 * `model`: The data model to validate
 * `returns`: An error if the validation fails, or nil if the validation succeeds
 
 ### pydantic.Model
 
 Defines a new data model.
-
 * `name`: The name of the model
 * `fields`: A map of field names to field definitions
 * `returns`: A new data model
+
+## pkg.go.dev badge
+
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/njchilds90/go-pydantic-port)](https://pkg.go.dev/github.com/njchilds90/go-pydantic-port)
