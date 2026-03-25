@@ -21,3 +21,7 @@ func splitWords(s string) []string {
 	}
 	return strings.Fields(s)
 }
+
+func joinWords(in []string) string {
+	return strings.Join(in, " ")
+}

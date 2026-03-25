@@ -1,4 +1,3 @@
-// Package goragkit provides helpers for validating LLM/RAG structured responses.
 package goragkit
 
 import (
@@ -8,14 +7,14 @@ import (
 	pydantic "github.com/njchilds90/go-pydantic-port"
 )
 
-// ValidateResult validates a generic RAG result map against a pydantic model.
-func ValidateResult(ctx context.Context, m *pydantic.Model, result map[string]any) error {
-	return pydantic.ValidateMap(ctx, m, result)
+// ValidateGoragkitResult validates a generic RAG result map against a pydantic model.
+func ValidateGoragkitResult(ctx context.Context, m *pydantic.Model, result map[string]any, opts ...pydantic.ValidateOption) error {
+	return pydantic.ValidateMap(ctx, m, result, opts...)
 }
 
 // ParseResult decodes and validates a JSON response to a typed output.
-func ParseResult[T any](ctx context.Context, payload []byte) (T, error) {
-	return pydantic.ParseAndValidate[T](ctx, payload)
+func ParseResult[T any](ctx context.Context, payload []byte, opts ...pydantic.ValidateOption) (T, error) {
+	return pydantic.ParseAndValidate[T](ctx, payload, opts...)
 }
 
 // MarshalSchema marshals schema for prompt/tool definitions.
