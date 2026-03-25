@@ -1,89 +1,111 @@
-# Go Pydantic Port
+# go-pydantic-port
 
-A Go port of Python's Pydantic library, providing runtime data validation and parsing for Go developers.
+[![Go Version](https://img.shields.io/badge/go-1.22+-00ADD8?logo=go)](https://go.dev/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/njchilds90/go-pydantic-port/actions/workflows/ci.yml/badge.svg)](https://github.com/njchilds90/go-pydantic-port/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen)](#performance)
+[![Version](https://img.shields.io/badge/version-v0.2.0-purple)](CHANGELOG.md)
 
-## Overview
+Production-grade runtime validation and schema enforcement for Go AI systems.
 
-This library allows you to define and validate complex data structures with ease. It provides a simple and intuitive API for defining models, and supports a wide range of validation rules.
+## Why Go AI teams need this
+
+LLM tool calling and structured output workflows need deterministic runtime validation in Go—without Python sidecars, serialization glue, or dynamic runtime surprises. `go-pydantic-port` gives AI agents:
+
+- **Runtime validation** for typed structs and dynamic tool payloads.
+- **JSON Schema generation** for prompts, tool definitions, and contract docs.
+- **Rich structured errors** for autonomous retries and debug loops.
+- **Optional AI-stack integrations** for goragkit/go-ruler and OTEL traces.
 
 ## Installation
 
-To install this library, run the following command:
-
 ```bash
-go get github.com/njchilds90/go-pydantic-port
+go get github.com/njchilds90/go-pydantic-port@v0.2.0
 ```
 
-## Usage
-
-Here is an example of how to define and validate a simple data model:
+## Quickstart
 
 ```go
 package main
 
 import (
-	"context"
-	"fmt"
+  "context"
+  "fmt"
 
-	"github.com/go-pydantic-port"
-	"github.com/go-playground/validator/v10"
+  pydantic "github.com/njchilds90/go-pydantic-port"
 )
 
-// User represents a simple data model
-//godoc
-func NewUser(name string, email string) (*User, error) {
-	if name == "" || email == "" {
-		return nil, fmt.Errorf("invalid input: name and email are required")
-	}
-	return &User{
-		Name:  name,
-		Email: email,
-	}, nil
-}
-
-type User struct {
-	Name  string `validate:"required"`
-	Email string `validate:"required,email"`
-}
-
 func main() {
-	ctx := context.Background()
-	user, err := NewUser("John Doe", "johndoe@example.com")
-	if err != nil {
-		panic(err)
-	}
-	
-	// example of using godoc comments for exported functions
-	// Validate takes a User and returns an error if validation fails
-	// godoc
-	func Validate(ctx context.Context, u *User) error {
-		if u == nil {
-			return fmt.Errorf("invalid input: user is nil")
-		}
-		return pydantic.Validate(ctx, u)
-	}
-	
-	if err := Validate(ctx, user); err != nil {
-		panic(err)
-	}
+  m := pydantic.NewModel("ToolPayload").
+    Field("query", "string", "required", "min=3").
+    Field("top_k", "integer", "min=1", "max=20")
+
+  input := map[string]any{"query": "golang otel", "top_k": 5}
+  if err := pydantic.ValidateMap(context.Background(), m, input); err != nil {
+    panic(err)
+  }
+
+  schema := m.Schema()
+  fmt.Println(schema["$schema"])
 }
+```
 
-## API Reference
+## CLI
 
-### pydantic.Validate
+```bash
+pydantic validate --model model.json --input payload.json
+pydantic schema --model model.json
+pydantic serve --model model.json --addr :8080
+```
 
-Validates a data model against a set of validation rules.
-* `ctx`: the context for the validation
-* `model`: The data model to validate
-* `returns`: An error if the validation fails, or nil if the validation succeeds
+`serve` exposes:
+- `GET /schema`
+- `POST /validate`
 
-### pydantic.Model
+## Architecture
 
-Defines a new data model.
-* `name`: The name of the model
-* `fields`: A map of field names to field definitions
-* `returns`: A new data model
+```mermaid
+flowchart LR
+  A[Typed Structs / Maps] --> B[Validation Engine]
+  B --> C[ValidationError (structured)]
+  B --> D[JSON Schema Generator]
+  D --> E[LLM Tool/Prompt Contracts]
+  B --> F[Optional Integrations]
+  F --> G[goragkit]
+  F --> H[go-ruler]
+  F --> I[OpenTelemetry]
+```
 
-## pkg.go.dev badge
+## AI-agent examples
 
-[![PkgGoDev](https://pkg.go.dev/badge/github.com/njchilds90/go-pydantic-port)](https://pkg.go.dev/github.com/njchilds90/go-pydantic-port)
+- Validate LLM JSON responses via `ParseAndValidate[T]`.
+- Build tool input contracts with `NewModel(...).Field(...)` and emit schema.
+- Run `goruler.ValidateThenEvaluate` to gate policy decisions.
+- Wrap validation spans using `integrations/otel` for observability.
+
+## Performance
+
+Benchmarks are included with `go test -bench=. ./...`.
+
+Current target characteristics:
+- reflection metadata cached via `sync.Map`
+- zero external runtime dependency in the core package
+- deterministic tag parser and low-allocation validation loops
+
+## Roadmap
+
+- Nested object/array schema refinements.
+- Localization/i18n for validation errors.
+- Pluggable custom validators.
+
+## Ecosystem
+
+Pairs well with:
+- [goragkit](https://github.com/njchilds90/goragkit)
+- [go-ruler](https://github.com/njchilds90/go-ruler)
+- goretry
+- go-result
+
+## License
+
+MIT

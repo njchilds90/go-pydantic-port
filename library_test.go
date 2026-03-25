@@ -1,133 +1,86 @@
 package pydantic
 
-// Package pydantic provides a simple validation system for Go structs.
-//
-// It includes support for common validation rules such as required, email, etc.
+import (
+	"context"
+	"encoding/json"
+	"testing"
+)
+
+type user struct {
+	Name  string `validate:"required,min=2"`
+	Email string `validate:"required,email"`
+	Age   int    `validate:"min=18,max=130"`
+	Role  string `validate:"oneof=admin user"`
+}
+
 func TestValidate(t *testing.T) {
-    // User represents a user with a name and email.
-    //
-    // Example usage:
-    //
-    //    user := User{
-    //        Name:  "John Doe",
-    //        Email: "johndoe@example.com",
-    //    }
-    //
-    type User struct {
-        // Name is the user's name.
-        Name  string `validate:"required"`
-        // Email is the user's email address.
-        Email string `validate:"required,email"`
-    }
-
-    tests := []struct {
-        name    string
-        user    User
-        wantErr bool
-    }{
-        {
-            name: "valid user",
-            user: User{
-                Name:  "John Doe",
-                Email: "johndoe@example.com",
-            },
-            wantErr: false,
-        },
-        {
-            name: "invalid email",
-            user: User{
-                Name:  "John Doe",
-                Email: "invalid",
-            },
-            wantErr: true,
-        },
-        {
-            name: "missing email",
-            user: User{
-                Name: "John Doe",
-            },
-            wantErr: true,
-        },
-    }
-
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            err := Validate(tt.user)
-            if (err != nil) != tt.wantErr {
-                t.Errorf("validation error = %v, wantErr %v", err, tt.wantErr)
-            }
-        })
-    }
+	t.Parallel()
+	tests := []struct {
+		name string
+		u    user
+		ok   bool
+	}{
+		{name: "valid", u: user{Name: "Jane", Email: "jane@example.com", Age: 20, Role: "admin"}, ok: true},
+		{name: "invalid email", u: user{Name: "Jane", Email: "bad", Age: 20, Role: "admin"}},
+		{name: "missing required", u: user{Email: "jane@example.com", Age: 20, Role: "admin"}},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := Validate(context.Background(), tt.u)
+			if tt.ok && err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if !tt.ok && err == nil {
+				t.Fatalf("expected err")
+			}
+		})
+	}
 }
 
-// ErrValidation represents a validation error.
-var ErrValidation = errors.New("validation failed")
-
-// Validate validates a given struct using the validation tags.
-//
-// It returns an error if the validation fails.
-func Validate(user interface{}) error {
-    // implementation of validate
-    return nil
+func TestParseAndValidate(t *testing.T) {
+	t.Parallel()
+	_, err := ParseAndValidate[user](context.Background(), []byte(`{"name":"Jay","email":"jay@example.com","age":33,"role":"user"}`))
+	if err != nil {
+		t.Fatalf("ParseAndValidate() err = %v", err)
+	}
 }
 
-func TestModel(t *testing.T) {
-    // Model represents a model with fields.
-    //
-    // Example usage:
-    //
-    //    fields := map[string]interface{}{
-    //        "name": "John Doe",
-    //        "email": "johndoe@example.com",
-    //    }
-    //
-    type Model struct {
-        // Name is the model's name.
-        Name string
-        // Fields are the model's fields.
-        Fields map[string]interface{}
-    }
+func TestModelBuilderAndSchema(t *testing.T) {
+	t.Parallel()
+	m := NewModel("Ticket").
+		Field("title", "string", "required", "min=3").
+		Field("priority", "string", "oneof=low medium high")
 
-    fields := map[string]interface{}{
-        "name": "John Doe",
-        "email": "johndoe@example.com",
-    }
+	payload := map[string]any{"title": "foo", "priority": "medium"}
+	if err := ValidateMap(context.Background(), m, payload); err != nil {
+		t.Fatalf("ValidateMap() err = %v", err)
+	}
+	if got := m.Schema()["type"]; got != "object" {
+		t.Fatalf("schema type = %v", got)
+	}
 
-    tests := []struct {
-        name    string
-        fields  map[string]interface{}
-        wantErr bool
-    }{
-        {
-            name: "valid fields",
-            fields: fields,
-            wantErr: false,
-        },
-        {
-            name: "nil fields",
-            fields: nil,
-            wantErr: true,
-        },
-    }
+	b, err := json.Marshal(m.Schema())
+	if err != nil || len(b) == 0 {
+		t.Fatalf("schema marshal err = %v", err)
+	}
+}
 
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            model := Model("User", tt.fields)
-            if model == nil && !tt.wantErr {
-                t.Errorf("model is nil")
-            }
-        })
-    }
+func TestJSONSchema(t *testing.T) {
+	t.Parallel()
+	s, err := JSONSchema[user]()
+	if err != nil {
+		t.Fatalf("JSONSchema() err = %v", err)
+	}
+	if s["title"] != "user" {
+		t.Fatalf("unexpected title: %v", s["title"])
+	}
 }
 
 func BenchmarkValidate(b *testing.B) {
-    user := User{
-        Name:  "John Doe",
-        Email: "johndoe@example.com",
-    }
-
-    b.ResetTimer()
-    for i := 0; i < b.N; i++ {
-        Validate(user)
-    }
+	u := user{Name: "Jane", Email: "jane@example.com", Age: 30, Role: "admin"}
+	for i := 0; i < b.N; i++ {
+		_ = Validate(context.Background(), u)
+	}
 }
