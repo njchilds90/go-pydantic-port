@@ -13,7 +13,12 @@
 
 `go-pydantic-port` is a zero-dependency runtime validation + JSON Schema library for Go apps and autonomous agents. It is strict by default, supports nested models, typed structs, fluent map validation, and agent-friendly error payloads.
 
-## Installation
+LLM tool calling and structured output workflows need deterministic runtime validation in Go—without Python sidecars, serialization glue, or dynamic runtime surprises. `go-pydantic-port` gives AI agents:
+
+- **Runtime validation** for typed structs and dynamic tool payloads.
+- **JSON Schema generation** for prompts, tool definitions, and contract docs.
+- **Rich structured errors** for autonomous retries and debug loops.
+- **Optional AI-stack integrations** for goragkit/go-ruler and OTEL traces.
 
 ```bash
 go get github.com/njchilds90/go-pydantic-port@v0.3.0
