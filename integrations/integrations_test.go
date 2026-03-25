@@ -16,11 +16,11 @@ func (engine) Evaluate(_ context.Context, input map[string]any) (bool, error) {
 }
 
 func TestIntegrations(t *testing.T) {
-	m := pydantic.NewModel("Decision").Field("status", "string").Required().OneOf("approved", "denied").End()
-	if err := goragkit.ValidateGoragkitResult(context.Background(), m, map[string]any{"status": "approved"}); err != nil {
+	m := pydantic.NewModel("Decision").Field("status", "string", "required", "oneof=approved denied")
+	if err := goragkit.ValidateResult(context.Background(), m, map[string]any{"status": "approved"}); err != nil {
 		t.Fatalf("ValidateResult err=%v", err)
 	}
-	ok, err := goruler.ValidateThenEvaluateWithRuler(context.Background(), m, map[string]any{"status": "approved"}, engine{})
+	ok, err := goruler.ValidateThenEvaluate(context.Background(), m, map[string]any{"status": "approved"}, engine{})
 	if err != nil || !ok {
 		t.Fatalf("ValidateThenEvaluate ok=%v err=%v", ok, err)
 	}

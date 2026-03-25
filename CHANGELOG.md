@@ -1,13 +1,18 @@
 # Changelog
 
-## v0.3.0 - 2026-03-25
-
-- Added nested model references in fluent builder (`Field("address", nestedModel, ...)`) with recursive map/array/object validation.
-- Added model-scoped custom validators (`AddValidator`) and fluent `.Custom(...)` binding.
-- Added strict-mode + field coercion controls (`SetStrictMode`, `.Coerce()`) with clear coercion errors.
-- Added nested JSON Schema generation with `$defs` for referenced models.
-- Added benchmark suite (`benchmarks_test.go`) and README performance numbers.
-
 ## v0.2.0 - 2026-03-24
 
-- Initial AI-first runtime validation baseline.
+### Added
+- Fluent model builder for dynamic AI-agent payload validation.
+- JSON Schema generation from fluent models and typed structs.
+- Rich `ValidationError` with field-level details.
+- Struct tag validation engine (`required`, `email`, `min`, `max`, `len`, `oneof`, `regexp`).
+- Model metadata caching for faster repeated validations.
+- `ParseAndValidate[T]` helper for LLM structured output parsing.
+- CLI (`validate`, `schema`, `serve`) in `cmd/pydantic`.
+- Optional integrations for goragkit, go-ruler, and OpenTelemetry.
+- CI workflow with race detector, golangci-lint, and coverage.
+
+### Changed
+- Module path standardized to `github.com/njchilds90/go-pydantic-port`.
+- README rewritten for AI-first workflows and production usage.

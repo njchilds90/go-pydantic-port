@@ -1,82 +1,54 @@
 # go-pydantic-port
 
 [![Go Version](https://img.shields.io/badge/go-1.22+-00ADD8?logo=go)](https://go.dev/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/njchilds90/go-pydantic-port/actions/workflows/ci.yml/badge.svg)](https://github.com/njchilds90/go-pydantic-port/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen)](#performance)
-[![Go Report Card](https://goreportcard.com/badge/github.com/njchilds90/go-pydantic-port)](https://goreportcard.com/report/github.com/njchilds90/go-pydantic-port)
+[![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen)](#performance)
+[![Version](https://img.shields.io/badge/version-v0.2.0-purple)](CHANGELOG.md)
 
-Runtime validation + JSON Schema for the Go AI stack: **goragkit -> go-ruler -> go-pydantic-port**.
+Production-grade runtime validation and schema enforcement for Go AI systems.
 
-## Highlights
+## Why Go AI teams need this
 
-- Fluent models + typed struct validation
-- Nested object/array/map validation
-- Model-scoped and global custom validators
-- Strict-by-default with optional field/global coercion
-- JSON Schema generation with nested `$defs`
+LLM tool calling and structured output workflows need deterministic runtime validation in Go—without Python sidecars, serialization glue, or dynamic runtime surprises. `go-pydantic-port` gives AI agents:
+
+- **Runtime validation** for typed structs and dynamic tool payloads.
+- **JSON Schema generation** for prompts, tool definitions, and contract docs.
+- **Rich structured errors** for autonomous retries and debug loops.
+- **Optional AI-stack integrations** for goragkit/go-ruler and OTEL traces.
+
+## Installation
+
+```bash
+go get github.com/njchilds90/go-pydantic-port@v0.2.0
+```
 
 ## Quickstart
 
 ```go
-address := pydantic.NewModel("Address").
-  Field("city", "string", "required").End()
+package main
 
-user := pydantic.NewModel("User").
-  Field("address", address, "required").End()
+import (
+  "context"
+  "fmt"
 
-err := pydantic.ValidateMap(ctx, user, map[string]any{
-  "address": map[string]any{"city": "Austin"},
-})
+  pydantic "github.com/njchilds90/go-pydantic-port"
+)
+
+func main() {
+  m := pydantic.NewModel("ToolPayload").
+    Field("query", "string", "required", "min=3").
+    Field("top_k", "integer", "min=1", "max=20")
+
+  input := map[string]any{"query": "golang otel", "top_k": 5}
+  if err := pydantic.ValidateMap(context.Background(), m, input); err != nil {
+    panic(err)
+  }
+
+  schema := m.Schema()
+  fmt.Println(schema["$schema"])
+}
 ```
-
-## Custom validators
-
-```go
-m := pydantic.NewModel("EmailInput").
-  AddValidator("is_email", func(_ context.Context, v any) error {
-    s := fmt.Sprintf("%v", v)
-    if !strings.Contains(s, "@") { return fmt.Errorf("invalid email") }
-    return nil
-  }).
-  Field("email", "string", "required").Custom("is_email").End()
-```
-
-## Coercion + strict mode
-
-```go
-m := pydantic.NewModel("Payload").
-  SetStrictMode(false).
-  Field("age", "integer", "required").Coerce().End()
-```
-
-## Architecture
-
-```mermaid
-flowchart TD
-  A[Input: map/JSON/struct] --> B[Model Compile Cache]
-  B --> C[Field Walker]
-  C --> D{Field kind}
-  D -->|primitive| E[Rule checks]
-  D -->|object model| F[Recursive model validate]
-  D -->|array| G[Validate each item recursively]
-  D -->|map| H[Validate each value recursively]
-  C --> I[Coercion if enabled]
-  C --> J[Custom validators]
-  E --> K[ValidationError paths]
-  F --> K
-  G --> K
-  H --> K
-  K --> L[Agent-safe JSON error]
-```
-
-## Performance
-
-`go test -bench=. -run=^$ ./...` (local CI-like runner):
-
-- `BenchmarkValidateSimpleMap`: ~129 ns/op
-- `BenchmarkValidateNestedMap`: ~430 ns/op
-- `BenchmarkValidateCoercionPath`: ~220 ns/op
 
 ## CLI
 
@@ -85,3 +57,55 @@ pydantic validate --model model.json --input payload.json
 pydantic schema --model model.json
 pydantic serve --model model.json --addr :8080
 ```
+
+`serve` exposes:
+- `GET /schema`
+- `POST /validate`
+
+## Architecture
+
+```mermaid
+flowchart LR
+  A[Typed Structs / Maps] --> B[Validation Engine]
+  B --> C[ValidationError (structured)]
+  B --> D[JSON Schema Generator]
+  D --> E[LLM Tool/Prompt Contracts]
+  B --> F[Optional Integrations]
+  F --> G[goragkit]
+  F --> H[go-ruler]
+  F --> I[OpenTelemetry]
+```
+
+## AI-agent examples
+
+- Validate LLM JSON responses via `ParseAndValidate[T]`.
+- Build tool input contracts with `NewModel(...).Field(...)` and emit schema.
+- Run `goruler.ValidateThenEvaluate` to gate policy decisions.
+- Wrap validation spans using `integrations/otel` for observability.
+
+## Performance
+
+Benchmarks are included with `go test -bench=. ./...`.
+
+Current target characteristics:
+- reflection metadata cached via `sync.Map`
+- zero external runtime dependency in the core package
+- deterministic tag parser and low-allocation validation loops
+
+## Roadmap
+
+- Nested object/array schema refinements.
+- Localization/i18n for validation errors.
+- Pluggable custom validators.
+
+## Ecosystem
+
+Pairs well with:
+- [goragkit](https://github.com/njchilds90/goragkit)
+- [go-ruler](https://github.com/njchilds90/go-ruler)
+- goretry
+- go-result
+
+## License
+
+MIT
