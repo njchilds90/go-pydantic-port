@@ -10,8 +10,8 @@ import (
 
 // Rule defines a single validation rule.
 type Rule struct {
-	Name string `json:"name"`
-	Arg  string `json:"arg,omitempty"`
+	Name string
+	Arg  string
 }
 
 // RuleError identifies the failing rule.
@@ -42,17 +42,17 @@ func parseRules(tag string) ([]Rule, error) {
 	return out, nil
 }
 
-func validateRules(field string, v reflect.Value, rules []Rule, l *Localizer, locale string) error {
+func validateRules(field string, v reflect.Value, rules []Rule) error {
 	for _, r := range rules {
 		switch r.Name {
 		case "required":
 			if isZero(v) {
-				return RuleError{Field: field, Rule: r.Name, Msg: l.Message(locale, "required")}
+				return RuleError{Field: field, Rule: r.Name, Msg: "value is required"}
 			}
 		case "email":
 			s := toString(v)
 			if !strings.Contains(s, "@") || !strings.Contains(strings.SplitN(s, "@", 2)[1], ".") {
-				return RuleError{Field: field, Rule: r.Name, Msg: l.Message(locale, "email")}
+				return RuleError{Field: field, Rule: r.Name, Msg: "must be a valid email"}
 			}
 		case "min":
 			if err := checkMin(v, r.Arg); err != nil {
@@ -78,7 +78,7 @@ func validateRules(field string, v reflect.Value, rules []Rule, l *Localizer, lo
 				}
 			}
 			if !found {
-				return RuleError{Field: field, Rule: r.Name, Msg: l.Message(locale, "oneof")}
+				return RuleError{Field: field, Rule: r.Name, Msg: "value not in allowed set"}
 			}
 		case "regexp":
 			re, err := regexp.Compile(r.Arg)
@@ -86,7 +86,7 @@ func validateRules(field string, v reflect.Value, rules []Rule, l *Localizer, lo
 				return fmt.Errorf("invalid regexp rule: %w", err)
 			}
 			if !re.MatchString(toString(v)) {
-				return RuleError{Field: field, Rule: r.Name, Msg: l.Message(locale, "regexp")}
+				return RuleError{Field: field, Rule: r.Name, Msg: "value does not match regexp"}
 			}
 		}
 	}
