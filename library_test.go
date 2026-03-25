@@ -1,133 +1,83 @@
 package pydantic
 
-// Package pydantic provides a simple validation system for Go structs.
-//
-// It includes support for common validation rules such as required, email, etc.
-func TestValidate(t *testing.T) {
-    // User represents a user with a name and email.
-    //
-    // Example usage:
-    //
-    //    user := User{
-    //        Name:  "John Doe",
-    //        Email: "johndoe@example.com",
-    //    }
-    //
-    type User struct {
-        // Name is the user's name.
-        Name  string `validate:"required"`
-        // Email is the user's email address.
-        Email string `validate:"required,email"`
-    }
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"testing"
+)
 
-    tests := []struct {
-        name    string
-        user    User
-        wantErr bool
-    }{
-        {
-            name: "valid user",
-            user: User{
-                Name:  "John Doe",
-                Email: "johndoe@example.com",
-            },
-            wantErr: false,
-        },
-        {
-            name: "invalid email",
-            user: User{
-                Name:  "John Doe",
-                Email: "invalid",
-            },
-            wantErr: true,
-        },
-        {
-            name: "missing email",
-            user: User{
-                Name: "John Doe",
-            },
-            wantErr: true,
-        },
-    }
-
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            err := Validate(tt.user)
-            if (err != nil) != tt.wantErr {
-                t.Errorf("validation error = %v, wantErr %v", err, tt.wantErr)
-            }
-        })
-    }
+type profile struct {
+	Bio string `json:"bio" validate:"required,min=3"`
+}
+type user struct {
+	Name    string  `json:"name" validate:"required,min=2"`
+	Profile profile `json:"profile" validate:"required"`
 }
 
-// ErrValidation represents a validation error.
-var ErrValidation = errors.New("validation failed")
-
-// Validate validates a given struct using the validation tags.
-//
-// It returns an error if the validation fails.
-func Validate(user interface{}) error {
-    // implementation of validate
-    return nil
+func TestNestedModelReference(t *testing.T) {
+	address := NewModel("Address").Field("city", "string", "required").End()
+	m := NewModel("User").Field("address", address, "required").End()
+	if err := ValidateMap(context.Background(), m, map[string]any{"address": map[string]any{"city": "NY"}}); err != nil {
+		t.Fatal(err)
+	}
+	err := ValidateMap(context.Background(), m, map[string]any{"address": map[string]any{}})
+	if err == nil {
+		t.Fatal("expected nested error")
+	}
 }
 
-func TestModel(t *testing.T) {
-    // Model represents a model with fields.
-    //
-    // Example usage:
-    //
-    //    fields := map[string]interface{}{
-    //        "name": "John Doe",
-    //        "email": "johndoe@example.com",
-    //    }
-    //
-    type Model struct {
-        // Name is the model's name.
-        Name string
-        // Fields are the model's fields.
-        Fields map[string]interface{}
-    }
+func TestCustomValidatorTable(t *testing.T) {
+	m := NewModel("Email").
+		AddValidator("is_email", func(_ context.Context, v any) error {
+			s := fmt.Sprintf("%v", v)
+			if len(s) < 3 || !strings.Contains(s, "@") {
+				return fmt.Errorf("invalid email")
+			}
+			return nil
+		}).
+		Field("email", "string", "required").Custom("is_email").End()
 
-    fields := map[string]interface{}{
-        "name": "John Doe",
-        "email": "johndoe@example.com",
-    }
-
-    tests := []struct {
-        name    string
-        fields  map[string]interface{}
-        wantErr bool
-    }{
-        {
-            name: "valid fields",
-            fields: fields,
-            wantErr: false,
-        },
-        {
-            name: "nil fields",
-            fields: nil,
-            wantErr: true,
-        },
-    }
-
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            model := Model("User", tt.fields)
-            if model == nil && !tt.wantErr {
-                t.Errorf("model is nil")
-            }
-        })
-    }
+	tests := []struct {
+		in any
+		ok bool
+	}{{"a@x.com", true}, {"xx", false}}
+	for _, tt := range tests {
+		err := ValidateMap(context.Background(), m, map[string]any{"email": tt.in})
+		if (err == nil) != tt.ok {
+			t.Fatalf("email=%v err=%v", tt.in, err)
+		}
+	}
 }
 
-func BenchmarkValidate(b *testing.B) {
-    user := User{
-        Name:  "John Doe",
-        Email: "johndoe@example.com",
-    }
+func TestCoercionStrictMode(t *testing.T) {
+	m := NewModel("Payload").SetStrictMode(false).Field("age", "integer", "min=18").Coerce().End()
+	if err := ValidateMap(context.Background(), m, map[string]any{"age": "22"}); err != nil {
+		t.Fatal(err)
+	}
+	strict := NewModel("Payload").Field("age", "integer", "min=18").End()
+	if err := ValidateMap(context.Background(), strict, map[string]any{"age": "22"}); err == nil {
+		t.Fatal("expected strict mode failure")
+	}
+}
 
-    b.ResetTimer()
-    for i := 0; i < b.N; i++ {
-        Validate(user)
-    }
+func TestStructNestedValidationPath(t *testing.T) {
+	err := Validate(context.Background(), user{Name: "ok", Profile: profile{Bio: "no"}})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	var verr *ValidationError
+	if !errors.As(err, &verr) || verr.Fields[0].Path == "" {
+		t.Fatalf("invalid error: %v", err)
+	}
+}
+
+func TestSchemaDefs(t *testing.T) {
+	child := NewModel("Child").Field("value", "string", "required").End()
+	m := NewModel("Parent").Field("child", child, "required").End()
+	s := m.Schema()
+	if _, ok := s["$defs"]; !ok {
+		t.Fatal("expected $defs")
+	}
 }
