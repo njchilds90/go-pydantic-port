@@ -1,9 +1,7 @@
-# Makefile for go-pydantic-port library
-
 .PHONY: build test lint fmt vet bench coverage
 
 build:
-	go build -o go-pydantic-port ./...
+	go build ./...
 
 test:
 	go test -race ./...
@@ -12,13 +10,13 @@ lint:
 	golangci-lint run
 
 fmt:
-	go fmt ./...
+	gofmt -w .
 
 vet:
 	go vet ./...
 
 bench:
-	go test -bench=. ./...
+	go test -bench=. -run=^$ ./...
 
 coverage:
 	go test -coverprofile=coverage.out ./...
